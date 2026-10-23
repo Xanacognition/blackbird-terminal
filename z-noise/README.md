@@ -1,4 +1,4 @@
-# Z-NOISE
+# Wonderblue-OS
 
 A Renoise-style tracker firmware concept for the FM-1, aimed at ambient breakbeat, breakcore, trip-hop and boom bap.
 
