@@ -254,6 +254,7 @@ input[type=file]{display:none}
         <li>Turn on <b>REC</b> and play pads while it runs to punch in on the nearest row. While stopped, each pad writes a row and steps down.</li>
         <li><b>RPT</b> is note repeat: hold a pad to roll it in time.</li>
         <li><b>SNG</b> keeps your songs. Signed in, they follow you to every device with this page; <b>BACKUP</b> saves them all to one file you can import anywhere.</li>
+        <li><b>SYN</b> is the keys' partner: chords under a melody, or a melody over chords, in its own sound.</li>
         <li><b>KEY</b> has a counter voice on its last SND page: a harmony, an octave, or an answer a few rows later, in its own sound.</li>
         <li><b>CHD</b> picks the chord progression (Axis pop, 50s, jazz, Andalusian and more). Bass, melody and pads move to the new chords and keep their rhythm. Pads 9–16 are the chord slots; tap one, then a chord on pads 1–7.</li>
       </ul>
@@ -308,6 +309,7 @@ const TRACKS=[
   {id:'HAT',type:'hat',full:'HATS'},
   {id:'BAS',type:'fm',full:'FM BASS'},
   {id:'KEY',type:'fm',full:'FM KEYS'},
+  {id:'SYN',type:'fm',full:'SYNTH 2'},
 ];
 const NT=TRACKS.length;
 const DEFP={
@@ -320,9 +322,10 @@ const DEFP={
 };
 const TRACK_P=[{src:0},{},{},{},
   {ratio:1,index:2.2,decay:.25,sustain:.35,release:.12,detune:3},
-  {ratio:1,index:1.2,decay:1,sustain:.3,attack:.005,release:.6,detune:8,tine:.5,chord:0}];
-const PAD_BASE={BAS:36,KEY:55};
-const GROUP_COL={BRK:'var(--amber)',KIK:'#c8792a',SNR:'#c8792a',HAT:'#c8792a',BAS:'var(--blue-lit)',KEY:'var(--teal)'};
+  {ratio:1,index:1.2,decay:1,sustain:.3,attack:.005,release:.6,detune:8,tine:.5,chord:0},
+  {ratio:1,index:.9,decay:2,sustain:.6,attack:.25,release:1.6,detune:16,tine:0,chord:3}];
+const PAD_BASE={BAS:36,KEY:55,SYN:55};
+const GROUP_COL={BRK:'var(--amber)',KIK:'#c8792a',SNR:'#c8792a',HAT:'#c8792a',BAS:'var(--blue-lit)',KEY:'var(--teal)',SYN:'var(--teal)'};
 
 // drum lanes: x hit, g ghost, o open hat
 const BREAKS=[
@@ -512,6 +515,32 @@ const SOUND_UPGRADE={
   'GABBER':{KIK:['HARDSTYLE','GABBER'],KEY:['HOOVER','RAVE STAB']},'FOOTWORK':{SNR:['CLAP'],KEY:['VOX CHOP','ORGAN']},
   'BREAKCORE':{KEY:['DETUNE PAD','STRINGS','CHOIR','RAVE STAB']},'TRIP-HOP':{KEY:['TAPE EP','WARM KEYS','STRINGS','ORGAN']},
 };
+const SIG={
+ 'TRIP-HOP':['DUB BASS/SUB BASS','TAPE EP/STRINGS','GLASS BELL/VOX AH'],'BOOM BAP':['FM PLUCK','TAPE EP/BRASSY','VOX CHOP/MUSIC BOX'],
+ 'LO-FI BEATS':['SUB BASS','WARM KEYS/TAPE EP','MUSIC BOX/GLASS BELL'],'TAPE HAZE':['SUB BASS','MUSIC BOX/SQUARE LEAD','DETUNE PAD/PWM PAD'],
+ 'VELVET 9TH':['FM PLUCK','GLASS BELL/MUSIC BOX','TAPE EP/WARM KEYS'],'JUNGLE':['REESE/SUB BASS','RAVE STAB/STRINGS','VOX AH/VOX CHOP'],
+ 'DRUM & BASS':['REESE','SYNTH PLUCK/GLASS BELL','PWM PAD/STRINGS'],'BREAKCORE':['SUB BASS','STRINGS/CHOIR/DETUNE PAD','HYPER VOX/MUSIC BOX'],
+ 'UK GARAGE':['SUB BASS/FM PLUCK','ORGAN/WARM KEYS','VOX CHOP'],'DUBSTEP':['REESE','HOOVER/SQUARE LEAD','VOX AH/PWM PAD'],
+ 'TRAP':['808 GLIDE','GLASS BELL/MUSIC BOX','CHOIR/STRINGS'],'AMBIENT':['SUB BASS','DETUNE PAD/CHOIR','GLASS BELL/MUSIC BOX'],
+ 'DARK AMBIENT':['DUB BASS','CHOIR/PWM PAD','GLASS BELL'],'AMBIENT BEATS':['SUB BASS','MUSIC BOX','DETUNE PAD/STRINGS'],
+ 'MATH ROCK':['FM PLUCK/DUB BASS','FM PLUCK/SYNTH PLUCK','ORGAN/WARM KEYS'],'ACID':['ACID','SQUARE LEAD/BRASSY','RAVE STAB'],
+ 'HOUSE':['FM PLUCK/SUB BASS','ORGAN/TAPE EP','VOX CHOP/VOX AH'],'DEEP HOUSE':['SUB BASS','WARM KEYS/TAPE EP','VOX AH/GLASS BELL'],
+ 'TECHNO':['DUB BASS/ACID','SYNTH PLUCK/FM PLUCK','RAVE STAB/PWM PAD'],'DUB TECHNO':['SUB BASS','ORGAN/PWM PAD','GLASS BELL'],
+ 'MINIMAL':['FM PLUCK','MUSIC BOX/GLASS BELL','ORGAN'],'ELECTRO':['ACID/FM PLUCK','SQUARE LEAD/BRASSY','PWM PAD/STRINGS'],
+ 'IDM':['SUB BASS/FM PLUCK','MUSIC BOX/SYNTH PLUCK','PWM PAD/CHOIR'],'BROKEN BEAT':['FM PLUCK','TAPE EP','SQUARE LEAD/VOX CHOP'],
+ 'BIG BEAT':['ACID/DUB BASS','HOOVER/BRASSY','RAVE STAB/ORGAN'],'DUB':['DUB BASS','ORGAN','GLASS BELL/BRASSY'],
+ 'FUNK':['FUNK BASS','ORGAN/BRASSY','TALK LEAD/SQUARE LEAD'],'DISCO':['FUNK BASS/FM PLUCK','STRINGS/BRASSY','SYNTH PLUCK/GLASS BELL'],
+ 'JAZZ HOP':['SUB BASS','TAPE EP','BRASSY/VOX AH'],'BOSSA':['SUB BASS','TAPE EP/WARM KEYS','GLASS BELL'],'AFROBEAT':['FUNK BASS','ORGAN','BRASSY'],
+ 'FOOTWORK':['808 GLIDE','VOX CHOP/ORGAN','SYNTH PLUCK'],'SHOEGAZE':['DUB BASS','PWM PAD/DETUNE PAD','HOOVER/SQUARE LEAD'],
+ 'POST ROCK':['DUB BASS','GLASS BELL/FM PLUCK','STRINGS'],'SYNTH POP':['FM PLUCK','SQUARE LEAD/BRASSY','SUPERSAW/PWM PAD'],
+ 'DARKWAVE':['FM PLUCK','SQUARE LEAD/ORGAN','PWM PAD/CHOIR'],'TRANCE':['FM PLUCK','SYNTH PLUCK/SUPERSAW','SUPERSAW/STRINGS'],
+ 'GABBER':['SUB BASS','HOOVER','RAVE STAB'],'HYPERPOP':['808 GLIDE','HYPER LEAD/HYPER VOX','SUPERSAW'],
+ 'FUNKADELIC HYPERPOP':['FUNK BASS','TALK LEAD/HYPER LEAD','BRASSY/SUPERSAW'],'RAVE':['REESE','RAVE STAB/HOOVER','VOX CHOP/HYPER VOX'],
+ 'HARDSTYLE':['REESE','SUPERSAW/HOOVER','SUPERSAW/CHOIR'],'HAPPY HARDCORE':['SUB BASS','SUPERSAW/HYPER VOX','RAVE STAB'],
+ 'JERSEY CLUB':['808 GLIDE','VOX CHOP/HYPER VOX','SUPERSAW'],'PHONK':['808 GLIDE','MUSIC BOX/GLASS BELL','CHOIR/VOX AH'],
+ 'DRILL':['808 GLIDE','STRINGS/GLASS BELL','CHOIR/STRINGS'],'FUTURE BASS':['808 GLIDE','SUPERSAW','VOX CHOP/HYPER VOX'],
+ 'NIGHTCORE':['SUB BASS','SUPERSAW/HYPER VOX','SUPERSAW/PWM PAD'],'DIGICORE':['808 GLIDE','HYPER LEAD/MUSIC BOX','PWM PAD/SUPERSAW'],
+};
 // how hard the beat pushes the bass and keys down (sidechain), by genre
 const PUMP={'HOUSE':.3,'DEEP HOUSE':.25,'TECHNO':.3,'ACID':.3,'TRANCE':.45,'HARDSTYLE':.5,'HAPPY HARDCORE':.45,'NIGHTCORE':.4,'FUTURE BASS':.55,
   'HYPERPOP':.4,'DIGICORE':.35,'RAVE':.3,'UK GARAGE':.25,'DISCO':.25,'GABBER':.4,'FUNKADELIC HYPERPOP':.3,'AMBIENT':0,'DARK AMBIENT':0};
@@ -519,7 +548,8 @@ const STYLES=GENRE_DEF.map(([name,blurb,bpm,swing,scales,progs,prog,g])=>({
   id:name.toLowerCase().replace(/[^a-z]+/g,'-'),name,blurb,bpm,swing,scales,scale:scales[0],progs,prog,storm:!!g.storm,
   keys:[0,2,4,5,7,9,10,11,1,3],age:g.fx[0],crush:g.fx[1],space:g.fx[2],keyChord:g.key==='chd',brks:g.bs,
   k:g.k.map(n=>LANES[n]),s:g.s.map(n=>LANES[n]),h:g.h.map(n=>LANES[n]),
-  gen:{BRK:g.brk,KIK:'lane',SNR:'lane',HAT:'lane',BAS:g.bas,KEY:g.km},sounds:{...g.snd,...(SOUND_UPGRADE[name]||{})},tr:{},
+  gen:{BRK:g.brk,KIK:'lane',SNR:'lane',HAT:'lane',BAS:g.bas,KEY:g.km,SYN:g.key==='chd'?['motif','arp','lead']:['pads','swell','stabs']},
+  sounds:{...g.snd,...(SOUND_UPGRADE[name]||{}),...(SIG[name]?{BAS:SIG[name][0].split('/'),KEY:SIG[name][1].split('/'),SYN:SIG[name][2].split('/')}:{})},tr:{},
   pump:PUMP[name]!=null?PUMP[name]:.15,ctr:g.key==='chd'?[0,0,4]:[0,5,6,1,2,4]}));
 const HALF_LANES={k:'x.........x.....',s:'........x.......',h:'x...x...x...x...'};
 const SONG_CHAIN=[0,1,0,4,2,5,6,3,0,7];
@@ -591,7 +621,7 @@ const SAVE_KEY='wonderblue.v2',OLD_KEY='znoise.v1';
 let state=null;
 function blankPattern(len=32){return {len,cells:Array.from({length:NT},()=>Array(len).fill(null)),seed:null};}
 function newState(){
-  return {v:3,pump:.15,name:'',songId:null,roll:null,bpm:88,swing:.56,key:2,scale:'DORIAN',age:.7,crush:.1,space:.45,mvol:.85,style:0,cur:0,chain:[0],
+  return {v:4,pump:.15,name:'',songId:null,roll:null,bpm:88,swing:.56,key:2,scale:'DORIAN',age:.7,crush:.1,space:.45,mvol:.85,style:0,cur:0,chain:[0],
     prog:{id:'VIBE',degs:[0,3,5,4],rows:16},patterns:Array.from({length:8},()=>blankPattern()),
     tracks:TRACKS.map((t,i)=>({p:{...DEFP[t.type],...TRACK_P[i]},vol:.75,pan:0,rev:.1,dly:0,mute:false,solo:false,chance:1,mutate:0,drift:0,density:.5}))};
 }
@@ -609,12 +639,17 @@ function load(){
 // a song from storage, a file or an older version: fill what is missing, refuse what is not a song
 function checkState(s){
   if(!s||!Array.isArray(s.patterns)||s.patterns.length!==8||!Array.isArray(s.tracks))return null;
-  if(s.v!==3){                                        // 0.1/0.2 had eight tracks: the second break and the grain/pad go
+  if(!(s.v>=3)){                                      // 0.1/0.2 had eight tracks: the second break and the grain/pad go
     if(s.tracks.length!==8)return null;
     const keep=[0,2,3,4,5,6];s.tracks=keep.map(i=>s.tracks[i]);
     s.patterns.forEach(pt=>{pt.cells=keep.map(i=>pt.cells[i]);pt.seed=null;});
     s.style=Math.max(0,STYLES.findIndex(x=>x.id===OLD_STYLE[s.style|0]));s.roll=null;s.v=3;
   }
+  if(s.v===3&&s.tracks.length===6){                  // 0.4 had six tracks: SYN joins, empty
+    s.tracks.push({p:{...DEFP.fm,...TRACK_P[6]},vol:.42,pan:0,rev:.4,dly:.1,mute:false,solo:false,chance:1,mutate:0,drift:0,density:.5});
+    s.patterns.forEach(pt=>pt.cells.push(Array(pt.len).fill(null)));s.roll=null;
+  }
+  s.v=4;
   if(s.tracks.length!==NT)return null;
   s.tracks.forEach((tr,i)=>{tr.p={...DEFP[TRACKS[i].type],...TRACK_P[i],...tr.p};});
   s.style=clamp(s.style|0,0,STYLES.length-1);
@@ -718,14 +753,14 @@ function genTrack(pi,ti,mode,dens,lanes){
         for(let i=0;i<16;i++)if(i===0||chance(.55+dens*.3))col[o+i]=C(N(pick([0,0,0,7,2,4,-7,1]),i),chance(.3)?15:9);
         else if(chance(.3))col[o+i]=C(-1,0);
       }
-    }else if(id==='KEY'&&CHD.includes(mode)){
+    }else if((id==='KEY'||id==='SYN')&&CHD.includes(mode)){
       const r=degAt(55+state.key),N=(d,i)=>degMidi(r+progDeg(o+i)+d);
       if(mode==='pads'){for(let i=0;i<16;i++)if(ch(o+i))col[o+i]=C(N(0,i),9);}
       else if(mode==='swell'){for(let i=0;i<16;i++)if(ch(o+i)){col[o+i]=C(N(0,i),9);}if(!col[o+13])col[o+13]=C(-1,0);}
       else if(mode==='stabs'){const rows=pick([[0,10],[3,10],[0,6,12],[2,8],[2,6,10,14]]);rows.forEach(i=>{col[o+i]=C(N(0,i),11);if(i+2<16&&!rows.includes(i+2))col[o+i+2]=C(-1,0);});}
       else if(mode==='jazz'){const rows=pick([[0,7,10],[0,3,10],[2,7,14],[0,10]]);rows.forEach((i,k)=>{col[o+i]=C(N(k===0?0:pick([0,0,2]),i),ri(9,12));if(i+3<16&&!rows.includes(i+3))col[o+i+3]=C(-1,0);});}
-    }else if(id==='KEY'){
-      const r=degAt(60+state.key),N=(d,i)=>degMidi(r+progDeg(o+i)+d);
+    }else if(id==='KEY'||id==='SYN'){
+      const r=degAt((id==='SYN'?72:60)+state.key),N=(d,i)=>degMidi(r+progDeg(o+i)+d);
       if(mode==='motif'){
         motif.forEach(([i,d,len],k)=>{let dd=d;if(last&&k===motif.length-1)dd=pick([0,4,7]);
           col[o+i]=C(N(dd,i),k===0?12:ri(9,11));if(i+len<16&&!motif.some(x=>x[0]===i+len))col[o+i+len]=C(-1,0);});
@@ -758,18 +793,19 @@ function genPattern(pi,v){
     const id=t.id,drum=['KIK','SNR','HAT'].includes(id);let mode=songMode(id,false),dens=state.tracks[ti].density,ln=main;
     if(v==='B')dens=Math.min(1,dens+.2);
     const chd=st.keyChord,brkOn=mode!=='off';
-    if(v==='C'){if(drum)mode='off';if(id==='BRK'&&brkOn)mode='sparse';if(id==='BAS')mode='sub';if(id==='KEY')mode=chd?'pads':songMode(id,true);}
+    if(v==='C'){if(drum)mode='off';if(id==='BRK'&&brkOn)mode='sparse';if(id==='BAS')mode='sub';if(id==='KEY')mode=chd?'pads':songMode(id,true);if(id==='SYN')mode=chd?'off':'pads';}
     else if(v==='D'){dens=Math.min(1,dens+.35);if(id==='BRK'&&brkOn&&st.storm)mode='storm';if(id==='SNR'&&mode!=='off')dens=1;}
     else if(v==='E'){ln=alt;if(!drum)mode=songMode(id,true);}
-    else if(v==='F'){ln=HALF_LANES;if(id==='BRK'&&brkOn)mode='half';if(id==='KEY'&&!chd)mode='lead';}
+    else if(v==='F'){ln=HALF_LANES;if(id==='BRK'&&brkOn)mode='half';if(id==='KEY'&&!chd)mode='lead';if(id==='SYN'&&chd)mode='lead';}
     else if(v==='G'){dens=Math.min(1,dens+.25);if(id==='BRK'&&brkOn)mode=st.storm?'storm':'chop';}
-    else if(v==='H'){if(id==='KIK'||id==='SNR')mode='off';if(id==='HAT')ln=HALF_LANES;if(id==='BRK'&&brkOn)mode='sparse';if(id==='BAS')mode='sub';if(id==='KEY')mode=chd?'swell':songMode(id,true);}
+    else if(v==='H'){if(id==='KIK'||id==='SNR')mode='off';if(id==='HAT')ln=HALF_LANES;if(id==='BRK'&&brkOn)mode='sparse';if(id==='BAS')mode='sub';if(id==='KEY')mode=chd?'swell':songMode(id,true);if(id==='SYN')mode=chd?songMode(id,true):'swell';}
     genTrack(pi,ti,mode,dens,ln);
   });
   if(v==='B')TRACKS.forEach((t,ti)=>mutateTrack(pi,ti,.25,true));
   if(v==='G')mutateTrack(pi,0,.35,true);
 }
 function progLen(prog){prog=prog||state.prog;return clamp(prog.degs.length*prog.rows,16,64);}
+const foldOct=n=>{while(n>96)n-=12;while(n<28)n+=12;return n;};   // keep a note in range by octaves, so it stays in the scale
 function mutateTrack(pi,ti,a,noSeed){
   const pat=state.patterns[pi],col=pat.cells[ti],L=pat.len,type=TRACKS[ti].type;
   if(!noSeed&&!pat.seed)pat.seed=JSON.stringify(pat.cells);
@@ -786,7 +822,7 @@ function mutateTrack(pi,ti,a,noSeed){
       if(c&&!keep&&chance(.6))col[r]=null;
       else if(!c){const roll=type==='hat'&&chance(.2);col[r]=C(60,type==='hat'?ri(5,9):ri(4,9),roll?'R':'',roll?2:0);}
     }else{
-      if(c&&c.n>=0){const d=degAt(c.n);c.n=clamp(chance(.7)?degMidi(d+pick([-2,-1,1,2])):degMidi(d+pick([-7,7])),24,100);}
+      if(c&&c.n>=0){const d=degAt(c.n);c.n=foldOct(chance(.7)?degMidi(d+pick([-2,-1,1,2])):degMidi(d+pick([-7,7])));}
       else if(!c&&type==='fm'&&chance(.25)){let prev=null;for(let k=r-1;k>=0;k--)if(col[k]&&col[k].n>=0){prev=col[k].n;break;}
         if(prev!=null)col[r]=C(degMidi(degAt(prev)+pick([0,2,4])),ri(7,10));}
     }
@@ -796,11 +832,11 @@ function applyStyle(si){
   const st=STYLES[si],s=newState(),pid=pick(st.progs),pr=PROGS.find(x=>x.id===pid)||PROGS[0];
   const degs=pid==='VIBE'?st.prog:pr.degs,scale=pid==='VIBE'?pick(st.scales):pr.scale;
   Object.assign(s,{style:si,bpm:ri(st.bpm[0],st.bpm[1]),swing:Math.round((st.swing[0]+rnd()*(st.swing[1]-st.swing[0]))*100)/100,key:pick(st.keys),scale,age:st.age,crush:st.crush,space:st.space});
-  const base={BRK:{vol:.75,rev:.06},KIK:{vol:.6},SNR:{vol:.48,rev:.15},HAT:{vol:.32},BAS:{vol:.68},KEY:{vol:.5,rev:.35,dly:.2}};
+  const base={BRK:{vol:.6,rev:.06},KIK:{vol:.5},SNR:{vol:.42,rev:.15},HAT:{vol:.28},BAS:{vol:.66},KEY:{vol:.58,rev:.3,dly:.2},SYN:{vol:.48,rev:.4,dly:.12}};
   TRACKS.forEach((t,i)=>{const o={...base[t.id],...(st.tr[t.id]||{})},{p,...rest}=o;Object.assign(s.tracks[i],rest);if(p)Object.assign(s.tracks[i].p,p);});
   Object.keys(st.sounds).forEach(id=>{const ti=TRACKS.findIndex(t=>t.id===id),type=TRACKS[ti].type,k=patchIdx(type,pick(st.sounds[id]));
     if(k>=0)applyPatch(type,s.tracks[ti].p,k);});
-  const kp=s.tracks[5].p;kp.chord=st.keyChord?pick([3,4]):0;
+  const kp=s.tracks[5].p;kp.chord=st.keyChord?pick([3,4]):0;s.tracks[6].p.chord=st.keyChord?0:pick([2,3,4]);
   kp.ctr=pick(st.ctr);kp.ctrPatch=patchIdx('fm',pick(['GLASS BELL','MUSIC BOX','SYNTH PLUCK','VOX CHOP','HYPER VOX','SQUARE LEAD']));kp.ctrLvl=.45;
   s.pump=st.pump;
   s.tracks[0].p.src=pick(st.brks);
@@ -973,7 +1009,7 @@ function initAudio(){
   for(let i=0;i<cd.length;i++)if(rnd()<.00006){const a=(rnd()*.8+.2)*(rnd()<.5?-1:1);for(let k=0;k<30&&i+k<cd.length;k++)cd[i+k]+=a*Math.exp(-k/5);}
   A.crack=ctx.createBufferSource();A.crack.buffer=cb;A.crack.loop=true;A.crackG=g();A.crackG.gain.value=0;A.crack.connect(A.crackG).connect(A.tone);A.crack.start();
   A.drumComp=ctx.createDynamicsCompressor();A.drumComp.threshold.value=-20;A.drumComp.ratio.value=4;A.drumComp.attack.value=.004;A.drumComp.release.value=.12;A.drumComp.knee.value=4;
-  A.drumGain=g();A.drumGain.gain.value=1.7;A.drumSat=ctx.createWaveShaper();A.drumSat.curve=satCurve(1.6);
+  A.drumGain=g();A.drumGain.gain.value=1.05;A.drumSat=ctx.createWaveShaper();A.drumSat.curve=satCurve(1.6);
   A.drumComp.connect(A.drumGain).connect(A.drumSat).connect(A.mixIn);
   A.music=g();A.music.connect(A.mixIn);
   A.tr=TRACKS.map((tk,ti)=>{const T={in:g(),drive:ctx.createWaveShaper(),filt:bq('lowpass',20000,.6),vol:g(),pan:ctx.createStereoPanner(),rs:g(),ds:g()};
@@ -1115,7 +1151,7 @@ function patternEnd(){
   if(touched&&pi===state.cur)rt.gridDirty=true;
   if(touched)save();
 }
-const SECTIONS={DRIFT:[1,1,1,1,0,0],DUST:[0,1,1,0,0,0],GROOVE:[0,0,0,0,0,0],PULSE:[1,0,1,0,0,1],BREAKS:[0,1,1,1,0,1],FLOAT:[1,1,1,1,1,0]};
+const SECTIONS={DRIFT:[1,1,1,1,0,0,0],DUST:[0,1,1,0,0,0,1],GROOVE:[0,0,0,0,0,0,0],PULSE:[1,0,1,0,0,1,0],BREAKS:[0,1,1,1,0,1,1],FLOAT:[1,1,1,1,1,0,0]};
 function sitStep(){
   const s=rt.sitState;s.left--;
   mutateTrack(rt.pi,ri(0,NT-1),.12+rnd()*.15);
@@ -1221,7 +1257,7 @@ function knobDefs(){
     {label:'PROG',get:()=>rt.progPick,set:v=>{rt.progPick=v;rt.progPreview=true;renderStatus();clearTimeout(rt.progT);rt.progT=setTimeout(()=>pickProg(rt.progPick),900);},min:0,max:PROGS.length-1,step:1,
      fmt:v=>PROGS[v].name,commit:v=>{clearTimeout(rt.progT);pickProg(v);}},
     {label:'CHORD LEN',get:()=>PROG_RATES.indexOf(state.prog.rows),set:v=>{clearTimeout(rt.rateT);rt.rateT=setTimeout(()=>setProg({...state.prog,rows:PROG_RATES[v]}),250);},min:0,max:PROG_RATES.length-1,step:1,fmt:v=>PROG_RATES[v]+' ROWS'},
-    {label:'VOICING',get:()=>state.tracks[5].p.chord,set:v=>{state.tracks[5].p.chord=v;save();},min:0,max:CHORDS.length-1,step:1,fmt:v=>CHORDS[v][0],commit:()=>hearChord(rt.slot)},
+    {label:'VOICING',get:()=>state.tracks[chordTrack()].p.chord,set:v=>{state.tracks[chordTrack()].p.chord=v;save();},min:0,max:CHORDS.length-1,step:1,fmt:v=>CHORDS[v][0],commit:()=>hearChord(rt.slot)},
     {label:'KEY',get:()=>state.key,set:v=>{transposeTo(v);},min:0,max:11,step:1,fmt:v=>KEY_NAMES[v]}];
   if(rt.page==='GEN')return [
     P('CHANCE',tr,'chance',0,1,.01,pct,()=>save()),P('MUTATE',tr,'mutate',0,1,.01,pct,()=>save()),
@@ -1292,7 +1328,7 @@ const FN={
   MST:()=>[['PAGE '+(rt.sub%3+1)+'/3',()=>{rt.sub++;renderKnobs();renderFns();}],['TAP',tapTempo],['LOAD WAV',()=>$('#file').click()],
     ['CLR PAT',()=>{const pat=curPat();pat.seed=JSON.stringify(pat.cells);pat.cells=pat.cells.map(()=>Array(pat.len).fill(null));renderGrid();save();msg('PATTERN CLEARED · RESTORE ON GEN TO UNDO');}]],
 };
-function defaultMode(ti){return {BRK:'straight',KIK:'lane',SNR:'lane',HAT:'lane',BAS:'roots',KEY:STYLES[state.style].keyChord?'pads':'motif'}[TRACKS[ti].id];}
+function defaultMode(ti){const c=STYLES[state.style].keyChord;return {BRK:'straight',KIK:'lane',SNR:'lane',HAT:'lane',BAS:'roots',KEY:c?'pads':'motif',SYN:c?'motif':'pads'}[TRACKS[ti].id];}
 function randSound(){
   const ti=rt.sel.t;sndPages(ti).forEach(pg=>pg.forEach(d=>{if(!d||d.label==='BREAK'||d.label==='OCTAVE'||d.label==='SOUND')return;let v=d.min+rnd()*(d.max-d.min);if(d.step)v=Math.round(v/d.step)*d.step;d.set(v);}));
   renderKnobs();msg('RANDOM '+TRACKS[ti].id+' SOUND');
@@ -1311,7 +1347,7 @@ function tapTempo(){
 }
 
 // ---------------------------------------------------------------- chord progressions
-const HARM=[4,5];                                    // the tracks that follow the chords: BAS, KEY
+const HARM=[4,5,6];                                  // the tracks that follow the chords: BAS, KEY, SYN
 function snapshot(){return JSON.stringify({prog:state.prog,scale:state.scale,key:state.key,patterns:state.patterns});}
 function pushUndo(){rt.progUndo.push(snapshot());if(rt.progUndo.length>12)rt.progUndo.shift();}
 function undoProg(){
@@ -1329,7 +1365,7 @@ function setProg(np){
     const L0=pat.len,L=Math.max(L0,progLen(np));
     pat.cells=pat.cells.map((col,ti)=>{const out=Array(L).fill(null);
       for(let r=0;r<L;r++){const src=r%L0,c=col[src];if(!c)continue;const n={...c};
-        if(HARM.includes(ti)&&c.n>=0){const d=degAt(c.n,oldS),chrom=c.n-degMidi(d,oldS);n.n=clamp(degMidi(d-progDeg(src,old)+progDeg(r,np),newS)+chrom,24,100);}
+        if(HARM.includes(ti)&&c.n>=0){const d=degAt(c.n,oldS),chrom=c.n-degMidi(d,oldS);n.n=foldOct(degMidi(d-progDeg(src,old)+progDeg(r,np),newS)+chrom);}
         out[r]=n;}
       return out;});
     pat.len=L;pat.seed=null;
@@ -1352,11 +1388,12 @@ function transposeTo(k){
   state.patterns.forEach(pat=>HARM.forEach(ti=>pat.cells[ti].forEach(c=>{if(c&&c.n>=0)c.n=clamp(c.n+d,24,100);})));
   state.key=k;renderGrid();renderPads();renderStatus();save();
 }
+function chordTrack(){return state.tracks[5].p.chord>0||!(state.tracks[6].p.chord>0)?5:6;}   // whichever of KEY and SYN plays the chords
 function hearChord(slot){
   if(!ctx||!state.prog.degs.length)return;
-  const d=state.prog.degs[slot%state.prog.degs.length],t=ctx.currentTime+.01,kp=state.tracks[5].p;
+  const d=state.prog.degs[slot%state.prog.degs.length],t=ctx.currentTime+.01,ct=chordTrack(),kp=state.tracks[ct].p;
   const root=degMidi(degAt(55+state.key)+d),notes=chordNotes(root,CHORDS[kp.chord][1].length>1?CHORDS[kp.chord][1]:[0,2,4]);
-  notes.forEach((m,i)=>{const v=synthVoice(ctx,A.tr[5].in,t+i*.012,m,.7/Math.sqrt(notes.length),kp,.7);v.ti=5;rt.voices.push(v);});
+  notes.forEach((m,i)=>{const v=synthVoice(ctx,A.tr[ct].in,t+i*.012,m,.7/Math.sqrt(notes.length),kp,.7);v.ti=ct;rt.voices.push(v);});
   const bv=synthVoice(ctx,A.tr[4].in,t,degMidi(degAt(36+state.key)+d),.7,state.tracks[4].p,.7);bv.ti=4;rt.voices.push(bv);
 }
 // pads: 1-7 the chords of the scale (tap to put one in the selected slot), 8 removes the last slot, 9-16 the slots
