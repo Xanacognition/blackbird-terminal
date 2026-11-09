@@ -262,23 +262,34 @@ def analyze(source, bpm_hint: float | None = None, max_seconds: float | None = 9
                     drum_hits=hits)
 
 
-def drop_drum_tones(notes: list[Note], hits, max_pitch: int = 62, max_len: float = 0.8,
-                    window: float = 0.04, decay: float = 0.35, min_share: float = 0.5) -> list[Note]:
+def drop_drum_tones(notes: list[Note], hits, max_len: float = 0.8,
+                    window: float = 0.04, decay: float = 0.35, min_share: float = 0.75) -> list[Note]:
     """Kicks and snares are pitched (a kick ~40-60 Hz, a snare ~150-250 Hz), so
     polyphonic detection hears them as short notes. Learn each drum's tone (a
     low pitch that starts on at least ``min_share`` of that drum's hits) and
     drop short notes of that pitch that start during the drum's decay."""
     drop: set[int] = set()
+    # A kick's fundamental sits around 40-100 Hz, a snare's body 150-260 Hz:
+    # only learn a drum's tone inside its own range, so chord notes that happen
+    # to change on every kick are never mistaken for it.
+    ranges = {"kick": (0, 45), "snare": (48, 60)}
     for kind in ("kick", "snare"):
+        lo, hi = ranges[kind]
         times = np.array(sorted({h.time for h in hits if h.kind == kind}))
         if len(times) < 2:
             continue
         counts: dict[int, int] = {}
         for t in times:
-            near = {n.pitch for n in notes if abs(n.start - t) <= window and n.pitch <= max_pitch}
+            # A drum's tone can wobble across a semitone boundary between hits
+            # (a 190 Hz snare reads as F#3 or G3), so count +-1 semitone.
+            # Kick tones can be picked up a little late (at the next onset), so
+            # look across the kick's decay; snares are short, look at the hit.
+            reach = decay if kind == "kick" else window
+            near = {n.pitch + d for n in notes if -window <= n.start - t <= reach and lo <= n.pitch <= hi
+                    for d in (-1, 0, 1)}
             for p in near:
                 counts[p] = counts.get(p, 0) + 1
-        tones = {p for p, c in counts.items() if c >= min_share * len(times)}
+        tones = {p + d for p, c in counts.items() if c >= min_share * len(times) and lo <= p <= hi for d in (-1, 0, 1)}
         if not tones:
             continue
         for i, n in enumerate(notes):

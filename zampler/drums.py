@@ -87,7 +87,7 @@ def detect_drums(y: np.ndarray, sr: int, sensitivity: float = 0.5,
         if sc[KICK] >= floor + 0.1:
             labels.append(KICK)
         # Snare: a strong mid jump that isn't just the kick's click.
-        if sc[SNARE] >= floor + 0.1 and (KICK not in labels or sc[SNARE] > 0.85):
+        if sc[SNARE] >= floor + 0.1 and (KICK not in labels or sc[SNARE] > max(0.85, sc[KICK])):
             labels.append(SNARE)
         # Hat: the top band jumps clearly more than the mids (a snare's noise
         # also reaches the top band, but its mids jump too).

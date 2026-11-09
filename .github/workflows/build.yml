@@ -1,0 +1,70 @@
+name: Build & test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  plugin:
+    name: plugin (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+          - name: macos
+            os: macos-latest
+          - name: linux
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev \
+            libxext-dev libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev xvfb ninja-build
+
+      - name: Configure
+        run: cmake -S plugin -B build -DCMAKE_BUILD_TYPE=Release ${{ runner.os == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"' || '' }}
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Engine tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Host test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a build/zampler_host_test_artefacts/Release/zampler_host_test build/Zampler_artefacts/Release/VST3/Zampler.vst3 editor.png
+
+      - name: Collect plugins
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp -R build/Zampler_artefacts/Release/VST3/Zampler.vst3 dist/
+          cp -R build/Zampler_artefacts/Release/CLAP/Zampler.clap dist/ 2>/dev/null || true
+          if [ -d build/Zampler_artefacts/Release/AU ]; then cp -R build/Zampler_artefacts/Release/AU/Zampler.component dist/; fi
+          if [ -d build/Zampler_artefacts/Release/Standalone ]; then cp -R build/Zampler_artefacts/Release/Standalone/* dist/; fi
+          mkdir -p dist/renoise-tool && cd renoise_tool/com.zampler.Import.xrnt && cmake -E tar cf ../../dist/renoise-tool/com.zampler.Import.xrnt --format=zip manifest.xml main.lua
+          cd ../.. && [ -f editor.png ] && cp editor.png dist/ || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zampler-${{ matrix.name }}
+          path: dist
