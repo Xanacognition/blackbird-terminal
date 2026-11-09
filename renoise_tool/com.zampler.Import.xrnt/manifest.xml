@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RenoiseScriptingTool doc_version="0">
+  <ApiVersion>6</ApiVersion>
+  <Id>com.zampler.Import</Id>
+  <Version>0.1</Version>
+  <Author>Zampler</Author>
+  <Name>Zampler Import</Name>
+  <Category>Pattern Editor</Category>
+  <Description>Imports patterns exported by Zampler (*.zampler.lua): the sample's notes plus the bass, chords and leads built on top of it, as new tracks starting at the selected pattern.</Description>
+  <Platform>Windows, Mac, Linux</Platform>
+</RenoiseScriptingTool>
