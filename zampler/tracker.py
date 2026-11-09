@@ -32,10 +32,11 @@ class Part:
     name: str
     steps: list[Step] = field(default_factory=list)
     instrument: int = 0  # Renoise instrument index (00..FE)
+    drums: bool = False  # pitches are General MIDI drum notes; never scale-locked
 
     def transposed(self, semitones: int) -> "Part":
         return Part(self.name, [Step(s.line, s.length, s.pitch + semitones, s.velocity) for s in self.steps],
-                    self.instrument)
+                    self.instrument, self.drums)
 
 
 @dataclass
@@ -84,6 +85,37 @@ def quantize(notes: list[Note], grid: Grid, key: Key | None = None, scale_lock: 
     return steps
 
 
+def quantize_poly(notes: list[Note], grid: Grid, key: Key | None = None, scale_lock: bool = False,
+                  min_length: int = 1) -> list[Step]:
+    """Grid steps for polyphonic notes: chord notes share a line. The same
+    pitch twice on one line is merged; a repeated pitch is cut where the next
+    one starts so note columns stay clean."""
+    by_slot: dict[tuple[int, int], Step] = {}
+    for n in sorted(notes, key=lambda n: n.start):
+        line = grid.to_line(n.start)
+        end = max(line + min_length, grid.to_line(n.end))
+        pitch = key.snap(n.pitch) if (scale_lock and key is not None) else n.pitch
+        slot = (line, pitch)
+        if slot in by_slot:
+            st = by_slot[slot]
+            st.length = max(st.length, end - line)
+            st.velocity = max(st.velocity, n.velocity)
+        else:
+            by_slot[slot] = Step(line, end - line, pitch, n.velocity)
+    steps = sorted(by_slot.values(), key=lambda s: (s.line, s.pitch))
+    last: dict[int, Step] = {}
+    for s in steps:
+        prev = last.get(s.pitch)
+        if prev is not None and prev.end > s.line:
+            prev.length = max(1, s.line - prev.line)
+        last[s.pitch] = s
+    return steps
+
+
+# Where each GM drum lands in Renoise: a drum kit starting at C-4.
+RENOISE_DRUM_OFFSET = 24  # GM 36 (kick) -> C-4, 38 -> D-4, 42 -> F#4
+
+
 def song_length(parts: list[Part], grid: Grid) -> int:
     """Total lines rounded up to whole bars."""
     end = max((s.end for p in parts for s in p.steps), default=grid.lines_per_bar)
@@ -127,8 +159,11 @@ def layout_columns(part: Part, total_lines: int) -> list[list[Cell]]:
     cols = [[Cell() for _ in range(total_lines)] for _ in range(max(1, len(col_free_at)))]
     for c, s in assignment:
         if 0 <= s.line < total_lines:
-            cols[c][s.line] = Cell(s.pitch, False, s.velocity, part.instrument)
+            pitch = s.pitch + RENOISE_DRUM_OFFSET if part.drums else s.pitch
+            cols[c][s.line] = Cell(pitch, False, s.velocity, part.instrument)
     for c, s in assignment:
+        if part.drums:
+            break  # one-shots: no note-offs needed
         if s.end < total_lines and cols[c][s.end].pitch is None:
             cols[c][s.end] = Cell(None, True)
     return cols

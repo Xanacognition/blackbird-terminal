@@ -44,6 +44,8 @@ class Analysis:
     pitch_profile: np.ndarray  # 12 bins, what the sample actually uses
     bar_chords: list[tuple[float, Chord]] = field(default_factory=list)  # (start sec, chord)
     beats: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    poly_notes: list[Note] = field(default_factory=list)  # every note, chords included
+    drum_hits: list = field(default_factory=list)  # list[drums.DrumHit]
 
     @property
     def seconds_per_beat(self) -> float:
@@ -77,29 +79,35 @@ def estimate_tempo(y: np.ndarray, sr: int, hint: float | None = None) -> tuple[f
     return bpm, np.asarray(beats)
 
 
-def refine_tempo(bpm: float, onsets: list[float], search: float = 0.06) -> float:
-    """Nudge a rough tempo so note onsets land on a 16th-note grid.
+def _grid_error(on: np.ndarray, bpm: float) -> float:
+    """Mean distance (in 16ths) of onsets from the best-fitting 16th grid.
+    The grid's phase is the circular mean of the onsets, so one early or late
+    detection doesn't shift the whole grid."""
+    phase = on / (60.0 / bpm / 4)
+    ang = 2 * np.pi * phase
+    offset = np.angle(np.mean(np.exp(1j * ang))) / (2 * np.pi)
+    d = phase - offset
+    return float(np.mean(np.abs(d - np.round(d))))
 
-    Tries every BPM (0.1 steps, integers preferred) within +-``search`` of the
-    estimate and keeps the one with the smallest mean grid error, measured
-    relative to the first onset. Trackers love integer tempos, so integer
-    candidates win ties.
+
+def refine_tempo(bpm: float, onsets: list[float], search: float = 0.06) -> float:
+    """Nudge a rough tempo so onsets land on a 16th-note grid.
+
+    Tries every BPM (0.1 steps) within +-``search`` of the estimate and keeps
+    the one with the smallest grid error. Trackers love integer tempos, so an
+    integer that is essentially as good wins.
     """
     if len(onsets) < 4:
         return round(bpm, 1)
-    on = np.asarray(onsets) - onsets[0]
+    on = np.asarray(onsets, dtype=float) - onsets[0]
     best = (np.inf, bpm)
     for cand in np.arange(bpm * (1 - search), bpm * (1 + search), 0.1):
         cand = round(float(cand), 1)
-        step = 60.0 / cand / 4
-        phase = on / step
-        err = float(np.mean(np.abs(phase - np.round(phase)))) + (0.0 if cand.is_integer() else 0.004)
+        err = _grid_error(on, cand)
         if err < best[0] - 1e-9:
             best = (err, cand)
-    for c in (round(best[1]),):  # snap to integer if it's essentially as good
-        step = 60.0 / c / 4
-        phase = on / step
-        if float(np.mean(np.abs(phase - np.round(phase)))) <= best[0] + 0.01:
+    for c in sorted({np.floor(best[1]), np.ceil(best[1])}, key=lambda c: abs(c - best[1])):
+        if _grid_error(on, c) <= best[0] + 0.01:
             return float(c)
     return best[1]
 
@@ -210,14 +218,13 @@ def bar_chords(y: np.ndarray, sr: int, bpm: float, key: Key, beats_per_bar: int 
 
 
 def analyze(source, bpm_hint: float | None = None, max_seconds: float | None = 90.0,
-            fmin: str = "C1", fmax: str = "C7") -> Analysis:
+            fmin: str = "C1", fmax: str = "C7", poly: bool = True, drums: bool = True,
+            max_poly: int = 6, drum_sensitivity: float = 0.5) -> Analysis:
     y, sr = load_audio(source, max_seconds) if not isinstance(source, np.ndarray) else (source, SR)
     y, _ = librosa.effects.trim(y, top_db=50)
     duration = len(y) / sr
     bpm, beats = estimate_tempo(y, sr, bpm_hint)
     notes = transcribe(y, sr, fmin=fmin, fmax=fmax)
-    if not bpm_hint:
-        bpm = refine_tempo(bpm, [n.start for n in notes])
 
     # Key: blend harmonic chroma with the transcribed notes (duration weighted)
     harm = chroma_profile(y, sr)
@@ -231,6 +238,52 @@ def analyze(source, bpm_hint: float | None = None, max_seconds: float | None = 9
     for n in notes:
         n.in_key = key.contains(n.pitch)
 
+    poly_notes: list[Note] = []
+    if poly:
+        from .poly import transcribe_poly
+
+        poly_notes = transcribe_poly(y, sr, fmin=fmin, fmax=fmax, max_poly=max_poly)
+        for n in poly_notes:
+            n.in_key = key.contains(n.pitch)
+    hits = []
+    if drums:
+        from .drums import detect_drums
+
+        hits = detect_drums(y, sr, drum_sensitivity)
+    if hits and poly_notes:
+        poly_notes = drop_drum_tones(poly_notes, hits)
+    if not bpm_hint:
+        # Drum hits are the sharpest timing reference; fall back to note starts.
+        grid_ref = sorted({round(h.time, 3) for h in hits}) if len(hits) >= 4 else [n.start for n in notes]
+        bpm = refine_tempo(bpm, grid_ref)
     chords = bar_chords(y, sr, bpm, key)
     return Analysis(duration=duration, bpm=bpm, key=key, key_confidence=conf, notes=notes,
-                    pitch_profile=profile, bar_chords=chords, beats=beats)
+                    pitch_profile=profile, bar_chords=chords, beats=beats, poly_notes=poly_notes,
+                    drum_hits=hits)
+
+
+def drop_drum_tones(notes: list[Note], hits, max_pitch: int = 62, max_len: float = 0.8,
+                    window: float = 0.04, decay: float = 0.35, min_share: float = 0.5) -> list[Note]:
+    """Kicks and snares are pitched (a kick ~40-60 Hz, a snare ~150-250 Hz), so
+    polyphonic detection hears them as short notes. Learn each drum's tone (a
+    low pitch that starts on at least ``min_share`` of that drum's hits) and
+    drop short notes of that pitch that start during the drum's decay."""
+    drop: set[int] = set()
+    for kind in ("kick", "snare"):
+        times = np.array(sorted({h.time for h in hits if h.kind == kind}))
+        if len(times) < 2:
+            continue
+        counts: dict[int, int] = {}
+        for t in times:
+            near = {n.pitch for n in notes if abs(n.start - t) <= window and n.pitch <= max_pitch}
+            for p in near:
+                counts[p] = counts.get(p, 0) + 1
+        tones = {p for p, c in counts.items() if c >= min_share * len(times)}
+        if not tones:
+            continue
+        for i, n in enumerate(notes):
+            if n.pitch in tones and n.duration <= max_len:
+                d = n.start - times
+                if np.any((d >= -window) & (d <= decay)):
+                    drop.add(i)
+    return [n for i, n in enumerate(notes) if i not in drop]

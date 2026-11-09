@@ -23,7 +23,7 @@ PROGRESSIONS: dict[str, list[int]] = {
     "i - i - iv - v": [0, 0, 3, 4],
 }
 
-BASS_STYLES = ["Root notes", "Eighths", "Root + fifth", "Octave bounce", "Walking", "Syncopated"]
+BASS_STYLES = ["Root notes", "Eighths", "Root + fifth", "Octave bounce", "Walking", "Syncopated", "Follow the kick"]
 CHORD_STYLES = ["Whole bar", "Half notes", "Off-beat stabs", "Quarter pulse", "Arp up", "Arp up/down"]
 LEAD_STYLES = ["Motif", "Harmony (3rd above sample)", "Counter-melody", "Octave double"]
 
@@ -44,7 +44,9 @@ def _root_in(chord: Chord, low: int) -> int:
 
 
 def bassline(key: Key, chords: list[Chord], grid: Grid, style: str = "Root notes", octave: int = 2,
-             velocity: int = 110, scale_lock: bool = True) -> Part:
+             velocity: int = 110, scale_lock: bool = True, kick_lines: list[int] | None = None) -> Part:
+    """``kick_lines`` (grid lines of the sample's kicks) drives the
+    'Follow the kick' style; without kicks it falls back to root notes."""
     low = (octave + 1) * 12  # C of that octave
     bar = grid.lines_per_bar
     beat = grid.lpb
@@ -59,7 +61,18 @@ def bassline(key: Key, chords: list[Chord], grid: Grid, style: str = "Root notes
         root = _root_in(chord, low)
         fifth = root + 7
         nxt = _root_in(chords[(b + 1) % len(chords)], low)
-        if style == "Root notes":
+        if style == "Follow the kick" and kick_lines:
+            # Kick pattern of the matching bar of the sample (looped if the
+            # sample is shorter), each bass note held until the next kick.
+            n_sample_bars = max(1, -(-(max(kick_lines) + 1) // bar))
+            src = (b % n_sample_bars) * bar
+            hits = sorted({k - src for k in kick_lines if src <= k < src + bar})
+            if not hits:
+                add(t0, bar, root)
+            for i, off in enumerate(hits):
+                nxt_hit = hits[i + 1] if i + 1 < len(hits) else bar
+                add(t0 + off, nxt_hit - off, root)
+        elif style == "Root notes" or style == "Follow the kick":
             add(t0, bar, root)
         elif style == "Eighths":
             for i in range(0, bar, eighth):
@@ -226,3 +239,19 @@ def sketch(text: str, key: Key, grid: Grid, step_lines: int | None = None, scale
         steps.append(Step(line, step_lines, p, velocity))
         line += step_lines
     return Part("Sketch", steps, instrument=4), fixes
+
+
+def drum_part(hits, grid: Grid, kinds: tuple[str, ...] = ("kick", "snare", "hat")) -> Part:
+    """The sample's drum hits on the grid (General MIDI notes 36/38/42;
+    shown as C-4/D-4/F#4 in Renoise). One-line hits; drums don't need OFFs."""
+    from .drums import GM
+
+    steps: dict[tuple[int, int], Step] = {}
+    for h in hits:
+        if h.kind not in kinds:
+            continue
+        line = grid.to_line(h.time)
+        key = (line, GM[h.kind])
+        if key not in steps or steps[key].velocity < h.velocity:
+            steps[key] = Step(line, 1, GM[h.kind], h.velocity)
+    return Part("Drums", sorted(steps.values(), key=lambda s: (s.line, s.pitch)), instrument=5, drums=True)

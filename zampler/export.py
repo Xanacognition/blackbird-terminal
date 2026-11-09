@@ -24,8 +24,13 @@ def to_midi(parts: list[Part], grid: Grid) -> bytes:
     meta.append(mido.MetaMessage("time_signature", numerator=grid.beats_per_bar, denominator=4, time=0))
     meta.append(mido.MetaMessage("end_of_track", time=0))
     mid.tracks.append(meta)
-    for ch, part in enumerate(parts):
-        channel = ch if ch < 9 else ch + 1  # skip GM drum channel 10
+    melodic = 0
+    for part in parts:
+        if part.drums:
+            channel = 9  # GM drum channel 10
+        else:
+            channel = melodic if melodic < 9 else melodic + 1  # skip channel 10
+            melodic += 1
         events: list[tuple[int, int, mido.Message]] = []
         for s in part.steps:
             if not 0 <= s.pitch <= 127:
